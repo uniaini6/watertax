@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>층별 수도요금 계산기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F4F7F8;
+    --surface: #FFFFFF;
+    --surface-2: #EBF2F3;
+    --ink: #16232B;
+    --muted: #5C7079;
+    --border: #DCE6E8;
+    --accent: #0E6E76;
+    --accent-ink: #FFFFFF;
+    --accent-soft: #DFF0EE;
+    --warn: #A9691B;
+    --warn-soft: #FBEEDD;
+    --danger: #B23A3A;
+    --danger-soft: #F7E6E6;
+    --ok: #2E7D46;
+    --ok-soft: #E4F3E8;
+    --font-display: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    --font-body: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10171B; --surface: #182229; --surface-2: #1E2A31; --ink: #E9F0F2;
+      --muted: #93A5AC; --border: #2B3A42; --accent: #46B9BE; --accent-ink: #08181A;
+      --accent-soft: #1F3538; --warn: #D6A25C; --warn-soft: #3A2E1C; --danger: #E38585;
+      --danger-soft: #3A2426; --ok: #79C48E; --ok-soft: #1E3324;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #10171B; --surface: #182229; --surface-2: #1E2A31; --ink: #E9F0F2;
+    --muted: #93A5AC; --border: #2B3A42; --accent: #46B9BE; --accent-ink: #08181A;
+    --accent-soft: #1F3538; --warn: #D6A25C; --warn-soft: #3A2E1C; --danger: #E38585;
+    --danger-soft: #3A2426; --ok: #79C48E; --ok-soft: #1E3324;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); }
+  body { padding: 32px 20px 80px; display: flex; justify-content: center; }
+  .page { width: 100%; max-width: 1020px; }
+
+  header.top { margin-bottom: 24px; }
+  header.top .eyebrow { color: var(--accent); font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+  header.top h1 { font-family: var(--font-display); font-size: 27px; font-weight: 700; margin: 0 0 8px; letter-spacing: -0.01em; }
+  header.top p { color: var(--muted); font-size: 15px; line-height: 1.6; margin: 0; max-width: 680px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px; margin-bottom: 18px; }
+  .card h2 { font-size: 16px; font-weight: 600; margin: 0 0 4px; }
+  .card .sub { font-size: 13px; color: var(--muted); margin: 0 0 14px; line-height: 1.5; }
+
+  .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
+  .field label { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+  .field .hint { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+  select, input[type="number"], input[type="text"] {
+    width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--ink); font-size: 14.5px; font-family: var(--font-body);
+  }
+  select:focus, input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 960px; }
+  th, td { padding: 10px 8px; border-bottom: 1px solid var(--border); font-size: 13.5px; text-align: right; white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; font-size: 12.5px; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  td.readonly { color: var(--ink); font-weight: 500; }
+  td.subtotal { color: var(--accent); font-weight: 600; }
+  .row-name-input { min-width: 90px; }
+  .status-tag { font-size: 11.5px; color: var(--muted); display: block; margin-top: 3px; }
+  .remove-btn { border: none; background: transparent; color: var(--danger); cursor: pointer; font-size: 13px; padding: 4px 6px; border-radius: 6px; }
+  .remove-btn:hover { background: var(--danger-soft); }
+  .remove-btn:focus-visible { outline: 2px solid var(--danger); }
+
+  .actions-row { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; flex-wrap: wrap; gap: 10px; }
+  button.add-btn { border: 1px dashed var(--accent); background: transparent; color: var(--accent); padding: 9px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; font-family: var(--font-body); }
+  button.add-btn:hover { background: var(--accent-soft); }
+  button.add-btn:focus-visible { outline: 2px solid var(--accent); }
+  .reset-link { background: none; border: none; color: var(--muted); font-size: 13px; text-decoration: underline; cursor: pointer; font-family: var(--font-body); }
+
+  .total-card { background: var(--accent); color: var(--accent-ink); border: none; }
+  .total-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-top: 4px; }
+  .total-grid .item .label { font-size: 12.5px; opacity: 0.85; margin-bottom: 4px; }
+  .total-grid .item .value { font-size: 20px; font-weight: 700; }
+  .total-grid .item.grand .value { font-size: 30px; }
+
+  .check-banner { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 10px; font-size: 13.5px; margin-top: 14px; }
+  .check-banner.ok { background: var(--ok-soft); color: var(--ok); }
+  .check-banner.warn { background: var(--warn-soft); color: var(--warn); }
+  .check-banner .amt { font-weight: 700; }
+
+  .note { font-size: 13px; color: var(--muted); line-height: 1.75; margin-top: 4px; }
+  .note code { background: var(--surface-2); padding: 1px 5px; border-radius: 5px; font-size: 12.5px; }
+  .note b { color: var(--ink); }
+
+  footer { text-align: center; color: var(--muted); font-size: 12.5px; margin-top: 20px; }
+
+  @media (max-width: 560px) {
+    header.top h1 { font-size: 22px; }
+    .card { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="top">
+    <div class="eyebrow">상가 수도요금 배분</div>
+    <h1>층별 수도요금 계산기</h1>
+    <p>일부 층만 계량기가 있어도, 주계량기 총사용량을 기준으로 공실은 0㎥, 계량기가 없는 층은 나머지로 처리해서 공정하게 나눕니다. 기본요금은 건물에 하나뿐인 계정 기준으로 한 번만 부담시킵니다.</p>
+  </header>
+
+  <div class="card">
+    <h2>공통 기준</h2>
+    <p class="sub">건물 전체에 실제로 나오는 고지서(계정 하나) 기준값입니다.</p>
+    <div class="settings-grid">
+      <div class="field">
+        <label for="year">요금 연도</label>
+        <select id="year">
+          <option value="2026">2026년</option>
+          <option value="2027">2027년</option>
+          <option value="2028">2028년</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="months">청구 기간(개월수)</label>
+        <input type="number" id="months" value="2" min="1" step="1">
+      </div>
+      <div class="field">
+        <label for="caliber">주계량기 구경(mm)</label>
+        <select id="caliber"></select>
+      </div>
+      <div class="field">
+        <label for="category">업종</label>
+        <select id="category">
+          <option value="일반용">일반용</option>
+          <option value="가정용">가정용</option>
+          <option value="욕탕용">욕탕용</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="total-usage">주계량기 총사용량(㎥)</label>
+        <input type="number" id="total-usage" placeholder="예: 13">
+        <div class="hint">고지서에 찍힌 이번 기간 총사용량</div>
+      </div>
+      <div class="field">
+        <label for="total-bill">실제 고지서 금액(원, 선택)</label>
+        <input type="number" id="total-bill" placeholder="예: 28420">
+        <div class="hint">입력하면 계산값과 맞는지 확인해드려요</div>
+      </div>
+      <div class="field">
+        <label for="period-label">이번 기간</label>
+        <input type="text" id="period-label" placeholder="예: 2026.9.7~11.6">
+      </div>
+      <div class="field">
+        <label for="base-policy">기본요금 배분 방식</label>
+        <select id="base-policy">
+          <option value="rep">대표 계정 층이 전액 부담</option>
+          <option value="equal-all">사용 여부 상관없이 층별 균등분배</option>
+          <option value="equal-active">공실 제외, 사용 중인 층끼리 균등분배</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>층별 입력</h2>
+    <p class="sub">상태를 먼저 고른 뒤 필요한 값만 입력하세요. "나머지(미계량)"는 한 행에만 지정할 수 있고, 총사용량에서 다른 행들을 뺀 값이 자동으로 들어갑니다.</p>
+    <div class="table-wrap">
+      <table id="floor-table">
+        <thead>
+          <tr>
+            <th>위치</th>
+            <th>상태</th>
+            <th>대표계정</th>
+            <th>이전 지침</th>
+            <th>현재 지침</th>
+            <th>사용량(㎥)</th>
+            <th>기본요금 몫</th>
+            <th>사용·하수·부담금</th>
+            <th>합계</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="floor-body"></tbody>
+      </table>
+    </div>
+    <div class="actions-row">
+      <button class="add-btn" id="add-row">+ 층 추가</button>
+      <button class="reset-link" id="reset-all">기본값으로 초기화</button>
+    </div>
+  </div>
+
+  <div class="card total-card">
+    <h2 style="color:inherit;">전체 합계</h2>
+    <div class="total-grid">
+      <div class="item"><div class="label">배분된 총사용량</div><div class="value" id="sum-usage">0 ㎥</div></div>
+      <div class="item"><div class="label">기본요금(1회)</div><div class="value" id="sum-base">0원</div></div>
+      <div class="item"><div class="label">사용·하수·부담금</div><div class="value" id="sum-usagecost">0원</div></div>
+      <div class="item grand"><div class="label">계산된 총 합계</div><div class="value" id="sum-grand">0원</div></div>
+    </div>
+    <div class="check-banner" id="check-banner"></div>
+  </div>
+
+  <div class="card">
+    <h2>요금 기록</h2>
+    <p class="sub">기간별로 저장해두면 나중에 나머지(지하) 사용량이 꾸준히 비슷한지, 갑자기 늘지는 않았는지 비교할 수 있어요.</p>
+    <div class="table-wrap">
+      <table id="history-table">
+        <thead>
+          <tr><th>기간</th><th>총사용량</th><th>총금액</th><th>층별 합계</th><th>비고</th><th>저장일</th><th></th></tr>
+        </thead>
+        <tbody id="history-body"></tbody>
+      </table>
+    </div>
+    <div class="actions-row">
+      <button class="add-btn" id="save-history">이번 계산 결과 기록에 저장</button>
+    </div>
+    <p class="sub" style="margin-top:14px;">예전 고지서를 나중에 참고용으로 기록만 해두고 싶다면:</p>
+    <div class="settings-grid">
+      <div class="field"><label for="manual-period">기간</label><input type="text" id="manual-period" placeholder="예: 2026.5.7~7.6"></div>
+      <div class="field"><label for="manual-usage">총사용량(㎥)</label><input type="number" id="manual-usage"></div>
+      <div class="field"><label for="manual-bill">총금액(원)</label><input type="number" id="manual-bill"></div>
+      <div class="field"><label for="manual-note">비고</label><input type="text" id="manual-note" placeholder="예: 계량기 설치 전"></div>
+    </div>
+    <div class="actions-row">
+      <button class="add-btn" id="save-manual">이 기록 추가</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>계산 방식</h2>
+    <p class="note">
+      <b>실제 고지서 금액을 입력하면</b> — 1㎥당 단가를 요금표로 추정하지 않고, "(고지서 총액 − 기본요금) ÷ 총사용량"으로 역산해서 씁니다. 그래서 각 층 합계를 다 더하면 항상 실제로 낸 금액과 정확히 같아져요.<br>
+      <b>고지서 금액을 비워두면</b> — 대신 요금표로 추정합니다: 1㎥당 단가 = 사용요금(업종별) + 하수도요금(<u>총사용량</u>이 속한 구간의 단가) + 물이용부담금(170원).<br>
+      <b>기본요금</b> = 구경별 기본요금 × 개월수 — 계정이 하나이므로 딱 한 번만 부과하고, 선택한 배분 방식대로 나눕니다.<br>
+      <b>각 층 합계</b> = 사용량 × 1㎥당 단가 + 그 층의 기본요금 몫<br><br>
+      예시 검증: 15mm·2개월·총사용량 13㎥ 기준으로 고지서 금액 28,420원을 입력하면, 역산된 1㎥당 단가는 (28,420−2,160)÷13 ≈ 2,020원이 됩니다.
+    </p>
+  </div>
+
+  <footer>입력값은 이 브라우저에 우선 저장되고, 가능하면 이 계산기 계정으로도 함께 저장됩니다. <span id="sync-note">동기화 확인 중…</span> 요금 기준은 서울특별시 수도조례 제23조 등에 근거합니다.</footer>
+</div>
+
+<script>
+(function () {
+  var STORAGE_KEY = 'water-calc-floors-v2';
+
+  var baseFee = {15:1080,20:3000,25:5200,32:9400,40:16000,50:25000,65:38900,75:52300,100:89000,125:143000,150:195000,200:277000,250:375000,300:465000,350:565000,400:615000};
+  var calibers = Object.keys(baseFee).map(Number).sort(function(a,b){return a-b;});
+
+  var usageUnitPrice = { '가정용': 580, '욕탕용': 500, '일반용': 1270 };
+
+  var sewerBrackets = {
+    2026: { '가정용': [{max: Infinity, rate: 480}], '욕탕용': [{max: 500, rate: 520}, {max: 2000, rate: 630}, {max: Infinity, rate: 720}], '일반용': [{max: 30, rate: 580}, {max: 100, rate: 1550}, {max: 1000, rate: 2100}, {max: Infinity, rate: 2200}] },
+    2027: { '가정용': [{max: Infinity, rate: 560}], '욕탕용': [{max: 500, rate: 590}, {max: 2000, rate: 710}, {max: Infinity, rate: 810}], '일반용': [{max: 30, rate: 660}, {max: 100, rate: 1690}, {max: 1000, rate: 2200}, {max: Infinity, rate: 2300}] },
+    2028: { '가정용': [{max: Infinity, rate: 630}], '욕탕용': [{max: 500, rate: 660}, {max: 2000, rate: 790}, {max: Infinity, rate: 890}], '일반용': [{max: 30, rate: 740}, {max: 100, rate: 1830}, {max: 1000, rate: 2300}, {max: Infinity, rate: 2400}] }
+  };
+
+  var WATER_LEVY_RATE = 170;
+
+  var defaultRows = [
+    { name: '지하1층', status: 'remainder', rep: true,  prev: '', curr: '' },
+    { name: '1층',     status: 'vacant',    rep: false, prev: '', curr: '' },
+    { name: '2층',     status: 'vacant',    rep: false, prev: '', curr: '' },
+    { name: '3층',     status: 'meter',     rep: false, prev: '0', curr: '2' }
+  ];
+
+  var yearEl = document.getElementById('year');
+  var monthsEl = document.getElementById('months');
+  var caliberEl = document.getElementById('caliber');
+  var categoryEl = document.getElementById('category');
+  var totalUsageEl = document.getElementById('total-usage');
+  var totalBillEl = document.getElementById('total-bill');
+  var basePolicyEl = document.getElementById('base-policy');
+  var periodLabelEl = document.getElementById('period-label');
+  var tbody = document.getElementById('floor-body');
+  var HISTORY_KEY = STORAGE_KEY + '-history';
+  var lastComputed = null;
+  var dbApi = null;
+  var dbReadyPromise = (async function () {
+    try { dbApi = await (window.claude && window.claude.use ? window.claude.use('db') : Promise.resolve(null)); }
+    catch (e) { dbApi = null; }
+  })();
+
+  function dbSet(key, data) {
+    if (!dbApi) return;
+    try { dbApi.doc(key).set(data).catch(function () {}); } catch (e) {}
+  }
+  async function dbGet(key) {
+    if (!dbApi) return null;
+    try { var doc = await dbApi.doc(key).get(); return doc && doc.data ? doc.data : null; }
+    catch (e) { return null; }
+  }
+
+  async function syncFromCloud() {
+    await dbReadyPromise;
+    var syncNote = document.getElementById('sync-note');
+    if (!dbApi) {
+      if (syncNote) syncNote.textContent = '지금은 이 브라우저에만 저장돼요.';
+      return;
+    }
+    try {
+      var rowsDoc = await dbGet('rows/main');
+      if (rowsDoc && Array.isArray(rowsDoc.list) && rowsDoc.list.length) {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rowsDoc.list)); } catch (e) {}
+      } else {
+        dbSet('rows/main', { list: loadRows() });
+      }
+      var settingsDoc = await dbGet('settings/main');
+      if (settingsDoc) {
+        try { localStorage.setItem(STORAGE_KEY + '-settings', JSON.stringify(settingsDoc)); } catch (e) {}
+      } else {
+        saveSettings();
+      }
+      var historyDoc = await dbGet('history/main');
+      if (historyDoc && Array.isArray(historyDoc.list)) {
+        try { localStorage.setItem(HISTORY_KEY, JSON.stringify(historyDoc.list)); } catch (e) {}
+      } else {
+        dbSet('history/main', { list: loadHistory() });
+      }
+      loadSettings();
+      render();
+      renderHistory();
+      if (syncNote) syncNote.textContent = '이 계정으로 열면 다른 기기에서도 같은 내용을 볼 수 있어요.';
+    } catch (e) { /* 동기화 실패 시 이 브라우저에 저장된 내용으로 계속 사용 */ }
+  }
+
+  calibers.forEach(function (mm) {
+    var opt = document.createElement('option'); opt.value = mm; opt.textContent = mm;
+    if (mm === 15) opt.selected = true;
+    caliberEl.appendChild(opt);
+  });
+
+  function fmt(n) { return Math.round(n).toLocaleString('ko-KR') + '원'; }
+
+  function loadRows() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) { var parsed = JSON.parse(raw); if (Array.isArray(parsed) && parsed.length) return parsed; }
+    } catch (e) { /* storage unavailable */ }
+    return defaultRows.slice();
+  }
+  function saveRows(rows) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rows)); } catch (e) {}
+    dbSet('rows/main', { list: rows });
+  }
+
+  function saveSettings() {
+    var s = {
+      year: yearEl.value, months: monthsEl.value, caliber: caliberEl.value,
+      category: categoryEl.value, totalUsage: totalUsageEl.value, totalBill: totalBillEl.value,
+      basePolicy: basePolicyEl.value, periodLabel: periodLabelEl.value
+    };
+    try { localStorage.setItem(STORAGE_KEY + '-settings', JSON.stringify(s)); } catch (e) {}
+    dbSet('settings/main', s);
+  }
+  function loadSettings() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY + '-settings');
+      if (raw) {
+        var s = JSON.parse(raw);
+        if (s.year) yearEl.value = s.year;
+        if (s.months) monthsEl.value = s.months;
+        if (s.caliber) caliberEl.value = s.caliber;
+        if (s.category) categoryEl.value = s.category;
+        if (s.totalUsage !== undefined) totalUsageEl.value = s.totalUsage;
+        if (s.totalBill !== undefined) totalBillEl.value = s.totalBill;
+        if (s.basePolicy) basePolicyEl.value = s.basePolicy;
+        if (s.periodLabel !== undefined) periodLabelEl.value = s.periodLabel;
+      }
+    } catch (e) {}
+  }
+
+  function loadHistory() {
+    try { var raw = localStorage.getItem(HISTORY_KEY); var parsed = raw ? JSON.parse(raw) : []; return Array.isArray(parsed) ? parsed : []; }
+    catch (e) { return []; }
+  }
+  function saveHistory(list) {
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list)); } catch (e) {}
+    dbSet('history/main', { list: list });
+  }
+
+  function renderHistory() {
+    var list = loadHistory();
+    var body = document.getElementById('history-body');
+    body.innerHTML = '';
+    list.slice().reverse().forEach(function (entry) {
+      var realIdx = list.indexOf(entry);
+      var tr = document.createElement('tr');
+      var tdPeriod = document.createElement('td'); tdPeriod.style.textAlign = 'left'; tdPeriod.textContent = entry.period || '(기간 미입력)';
+      var tdUsage = document.createElement('td'); tdUsage.textContent = (entry.totalUsage != null ? entry.totalUsage.toLocaleString('ko-KR') + ' ㎥' : '-');
+      var tdBill = document.createElement('td'); tdBill.textContent = (entry.totalBill != null ? fmt(entry.totalBill) : '-');
+      var tdRows = document.createElement('td'); tdRows.style.textAlign = 'left'; tdRows.style.whiteSpace = 'normal';
+      tdRows.textContent = (entry.rows && entry.rows.length) ? entry.rows.map(function (r) { return r.name + ' ' + fmt(r.total); }).join(' · ') : '-';
+      var tdNote = document.createElement('td'); tdNote.style.textAlign = 'left';
+      var noteInput = document.createElement('input'); noteInput.type = 'text'; noteInput.value = entry.note || '';
+      noteInput.placeholder = '메모';
+      noteInput.style.minWidth = '140px';
+      noteInput.addEventListener('input', function () { entry.note = noteInput.value; list[realIdx] = entry; saveHistory(list); });
+      tdNote.appendChild(noteInput);
+      var tdSaved = document.createElement('td'); tdSaved.textContent = entry.savedAt ? entry.savedAt.slice(0, 10) : '-';
+      var tdDel = document.createElement('td');
+      var delBtn = document.createElement('button'); delBtn.className = 'remove-btn'; delBtn.textContent = '삭제';
+      delBtn.addEventListener('click', function () { list.splice(realIdx, 1); saveHistory(list); renderHistory(); });
+      tdDel.appendChild(delBtn);
+      tr.appendChild(tdPeriod); tr.appendChild(tdUsage); tr.appendChild(tdBill); tr.appendChild(tdRows); tr.appendChild(tdNote); tr.appendChild(tdSaved); tr.appendChild(tdDel);
+      body.appendChild(tr);
+    });
+  }
+
+  function sewerRateFor(year, category, usage) {
+    var brackets = (sewerBrackets[year] || sewerBrackets[2026])[category] || sewerBrackets[2026]['일반용'];
+    for (var i = 0; i < brackets.length; i++) { if (usage <= brackets[i].max) return brackets[i].rate; }
+    return brackets[brackets.length - 1].rate;
+  }
+
+  function meterUsage(row) {
+    var prev = parseFloat(row.prev), curr = parseFloat(row.curr);
+    return (isFinite(prev) && isFinite(curr) && curr > prev) ? (curr - prev) : 0;
+  }
+
+  function render() {
+    var rows = loadRows();
+    tbody.innerHTML = '';
+
+    var months = parseFloat(monthsEl.value) || 0;
+    var year = parseInt(yearEl.value, 10);
+    var caliber = parseInt(caliberEl.value, 10);
+    var category = categoryEl.value;
+    var totalUsageInput = parseFloat(totalUsageEl.value);
+    var hasTotalUsage = isFinite(totalUsageInput);
+
+    // usage for meter/vacant rows first
+    var knownSum = 0;
+    var remainderIdx = -1;
+    rows.forEach(function (row, idx) {
+      if (row.status === 'meter') knownSum += meterUsage(row);
+      else if (row.status === 'vacant') { /* 0 */ }
+      else if (row.status === 'remainder') { if (remainderIdx === -1) remainderIdx = idx; }
+    });
+
+    var buildingTotalUsage = hasTotalUsage ? totalUsageInput : knownSum;
+    var remainderUsage = hasTotalUsage ? Math.max(0, totalUsageInput - knownSum) : 0;
+
+    var officialBase = (baseFee[caliber] || 0) * months;
+    var sewerRate = sewerRateFor(year, category, buildingTotalUsage);
+    var perM3 = (usageUnitPrice[category] || 0) + sewerRate + WATER_LEVY_RATE;
+    var usingActualBill = false;
+    var billInputForRate = parseFloat(totalBillEl.value);
+    if (isFinite(billInputForRate) && buildingTotalUsage > 0) {
+      // 실제 고지서 금액을 기준으로 1㎥당 단가를 역산합니다 — 요금표 추정치보다 실제 금액을 우선합니다.
+      perM3 = Math.max(0, (billInputForRate - officialBase) / buildingTotalUsage);
+      usingActualBill = true;
+    }
+
+    // base fee share counts
+    var repCount = 0, activeCount = 0, totalCount = rows.length;
+    rows.forEach(function (row) {
+      if (row.rep) repCount++;
+      if (row.status !== 'vacant') activeCount++;
+    });
+
+    var sums = { usage: 0, base: 0, usagecost: 0, total: 0 };
+    var rowSnapshots = [];
+
+    rows.forEach(function (row, idx) {
+      var usage = 0;
+      if (row.status === 'meter') usage = meterUsage(row);
+      else if (row.status === 'vacant') usage = 0;
+      else if (row.status === 'remainder' && idx === remainderIdx) usage = remainderUsage;
+
+      var baseShare = 0;
+      var policy = basePolicyEl.value;
+      if (policy === 'rep') { baseShare = row.rep && repCount > 0 ? officialBase / repCount : 0; }
+      else if (policy === 'equal-all') { baseShare = totalCount > 0 ? officialBase / totalCount : 0; }
+      else if (policy === 'equal-active') { baseShare = (row.status !== 'vacant' && activeCount > 0) ? officialBase / activeCount : 0; }
+
+      var usageCost = usage * perM3;
+      var rowTotal = baseShare + usageCost;
+
+      sums.usage += usage; sums.base += baseShare; sums.usagecost += usageCost; sums.total += rowTotal;
+      rowSnapshots.push({ name: row.name, usage: usage, total: rowTotal });
+
+      var tr = document.createElement('tr');
+
+      var tdName = document.createElement('td');
+      var nameInput = document.createElement('input');
+      nameInput.type = 'text'; nameInput.className = 'row-name-input'; nameInput.value = row.name;
+      nameInput.addEventListener('input', function () { row.name = nameInput.value; saveRows(rows); });
+      tdName.appendChild(nameInput);
+      tr.appendChild(tdName);
+
+      var tdStatus = document.createElement('td');
+      var statusSelect = document.createElement('select');
+      [['meter','계량기 있음'], ['vacant','공실(0㎥)'], ['remainder','나머지(미계량)']].forEach(function (pair) {
+        var opt = document.createElement('option'); opt.value = pair[0]; opt.textContent = pair[1];
+        if (row.status === pair[0]) opt.selected = true;
+        statusSelect.appendChild(opt);
+      });
+      statusSelect.addEventListener('change', function () { row.status = statusSelect.value; saveRows(rows); render(); });
+      tdStatus.appendChild(statusSelect);
+      if (row.status === 'remainder' && idx !== remainderIdx) {
+        var tag = document.createElement('span'); tag.className = 'status-tag'; tag.textContent = '행당 1개만 적용';
+        tdStatus.appendChild(tag);
+      }
+      tr.appendChild(tdStatus);
+
+      var tdRep = document.createElement('td');
+      var repCb = document.createElement('input'); repCb.type = 'checkbox'; repCb.checked = !!row.rep;
+      repCb.addEventListener('change', function () { row.rep = repCb.checked; saveRows(rows); render(); });
+      tdRep.appendChild(repCb);
+      tr.appendChild(tdRep);
+
+      var tdPrev = document.createElement('td');
+      var prevInput = document.createElement('input'); prevInput.type = 'number'; prevInput.value = row.prev;
+      prevInput.disabled = row.status !== 'meter';
+      prevInput.addEventListener('input', function () { row.prev = prevInput.value; saveRows(rows); render(); });
+      tdPrev.appendChild(prevInput);
+      tr.appendChild(tdPrev);
+
+      var tdCurr = document.createElement('td');
+      var currInput = document.createElement('input'); currInput.type = 'number'; currInput.value = row.curr;
+      currInput.disabled = row.status !== 'meter';
+      currInput.addEventListener('input', function () { row.curr = currInput.value; saveRows(rows); render(); });
+      tdCurr.appendChild(currInput);
+      tr.appendChild(tdCurr);
+
+      var tdUsage = document.createElement('td'); tdUsage.className = 'readonly';
+      tdUsage.textContent = usage.toLocaleString('ko-KR') + ' ㎥' + (row.status === 'remainder' ? (idx === remainderIdx ? '' : ' (미사용)') : '');
+      tr.appendChild(tdUsage);
+
+      var tdBase = document.createElement('td'); tdBase.className = 'readonly'; tdBase.textContent = fmt(baseShare);
+      tr.appendChild(tdBase);
+
+      var tdUsageCost = document.createElement('td'); tdUsageCost.className = 'readonly'; tdUsageCost.textContent = fmt(usageCost);
+      tr.appendChild(tdUsageCost);
+
+      var tdTotal = document.createElement('td'); tdTotal.className = 'subtotal'; tdTotal.textContent = fmt(rowTotal);
+      tr.appendChild(tdTotal);
+
+      var tdRemove = document.createElement('td');
+      var removeBtn = document.createElement('button'); removeBtn.className = 'remove-btn'; removeBtn.textContent = '삭제';
+      removeBtn.addEventListener('click', function () { rows.splice(idx, 1); saveRows(rows); render(); });
+      tdRemove.appendChild(removeBtn);
+      tr.appendChild(tdRemove);
+
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('sum-usage').textContent = sums.usage.toLocaleString('ko-KR') + ' ㎥';
+    document.getElementById('sum-base').textContent = fmt(sums.base);
+    document.getElementById('sum-usagecost').textContent = fmt(sums.usagecost);
+    document.getElementById('sum-grand').textContent = fmt(sums.total);
+
+    var banner = document.getElementById('check-banner');
+    var billInput = parseFloat(totalBillEl.value);
+    if (isFinite(billInput)) {
+      var diff = Math.round(sums.total) - Math.round(billInput);
+      if (Math.abs(diff) <= 1) {
+        banner.className = 'check-banner ok';
+        banner.innerHTML = usingActualBill
+          ? '실제 고지서 <span class="amt">' + Math.round(billInput).toLocaleString('ko-KR') + '원</span>을 기준으로 나눈 값입니다. 배분된 합계가 고지서 금액과 정확히 일치합니다.'
+          : '실제 고지서 금액과 <span class="amt">정확히 일치</span>합니다.';
+      } else {
+        banner.className = 'check-banner warn';
+        banner.innerHTML = '기본요금(구경 ' + caliber + 'mm × ' + months + '개월 = ' + fmt(officialBase) + ')을 뺀 나머지를 사용량으로 나눈 금액이 고지서와 <span class="amt">' + Math.abs(diff).toLocaleString('ko-KR') + '원</span> ' + (diff > 0 ? '더 많습니다' : '더 적습니다') + '. 총사용량이 비어 있으면 역산이 안 되니 먼저 채워주세요.';
+      }
+      banner.style.display = 'flex';
+    } else {
+      banner.style.display = 'none';
+    }
+
+    lastComputed = {
+      period: periodLabelEl.value,
+      totalUsage: buildingTotalUsage,
+      totalBill: isFinite(billInput) ? billInput : Math.round(sums.total),
+      rows: rowSnapshots
+    };
+  }
+
+  document.getElementById('add-row').addEventListener('click', function () {
+    var rows = loadRows();
+    rows.push({ name: '새 위치', status: 'vacant', rep: false, prev: '', curr: '' });
+    saveRows(rows); render();
+  });
+  document.getElementById('reset-all').addEventListener('click', function () { saveRows(defaultRows.slice()); render(); });
+
+  document.getElementById('save-history').addEventListener('click', function () {
+    if (!lastComputed) return;
+    var list = loadHistory();
+    list.push({
+      period: lastComputed.period,
+      totalUsage: lastComputed.totalUsage,
+      totalBill: lastComputed.totalBill,
+      rows: lastComputed.rows,
+      savedAt: new Date().toISOString()
+    });
+    saveHistory(list);
+    renderHistory();
+  });
+
+  document.getElementById('save-manual').addEventListener('click', function () {
+    var period = document.getElementById('manual-period').value;
+    var usage = parseFloat(document.getElementById('manual-usage').value);
+    var bill = parseFloat(document.getElementById('manual-bill').value);
+    var note = document.getElementById('manual-note').value;
+    if (!period && !isFinite(bill)) return;
+    var list = loadHistory();
+    list.push({
+      period: period,
+      totalUsage: isFinite(usage) ? usage : null,
+      totalBill: isFinite(bill) ? bill : null,
+      note: note,
+      savedAt: new Date().toISOString()
+    });
+    saveHistory(list);
+    renderHistory();
+    document.getElementById('manual-period').value = '';
+    document.getElementById('manual-usage').value = '';
+    document.getElementById('manual-bill').value = '';
+    document.getElementById('manual-note').value = '';
+  });
+
+  [yearEl, monthsEl, caliberEl, categoryEl, totalUsageEl, totalBillEl, basePolicyEl, periodLabelEl].forEach(function (el) {
+    el.addEventListener('change', function () { saveSettings(); render(); });
+    el.addEventListener('input', function () { saveSettings(); render(); });
+  });
+
+  renderHistory();
+  loadSettings();
+  render();
+  syncFromCloud();
+})();
+</script>
+</body>
+</html>
